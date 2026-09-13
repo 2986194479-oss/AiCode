@@ -347,7 +347,9 @@ class AIAgentViewModel @Inject constructor(
         relParts: List<String>,
         out: MutableList<FileTreeNode>
     ) {
-        for (entry in entries.sortedWith(BROWSE_ORDER)) {
+        // 按名字去重：文件系统的 readdir 在 FUSE 存储（外部工作区/模拟存储）上可能重复返回同一条目，
+        // AOSP 的 ReaddirHelper 亦做同样处理。同名条目会产生重复的节点 path，撞坏 LazyColumn 的 key。
+        for (entry in entries.distinctBy { it.name }.sortedWith(BROWSE_ORDER)) {
             val path = "$parent/${entry.name}"
             val parts = relParts + entry.name
             val ignored = ignorePatterns.isNotEmpty() &&
