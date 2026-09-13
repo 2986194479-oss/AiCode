@@ -224,7 +224,7 @@ class GeminiAdapter @Inject constructor(
                             if (!line.startsWith("data:")) continue
                             val data = line.removePrefix("data:").trim()
                             if (data.isEmpty()) continue
-                            rawSse.append(line).append('\n')
+                            AILogger.appendRawSse(rawSse, line)
                             val obj = runCatching { JsonParser.parseString(data).asJsonObject }.getOrNull() ?: continue
                             
                             try {
@@ -449,7 +449,7 @@ class GeminiAdapter @Inject constructor(
                                 if (!line.startsWith("data:")) continue
                                 val data = line.removePrefix("data:").trim()
                                 if (data.isEmpty()) continue
-                                rawSse.append(line).append('\n')
+                                AILogger.appendRawSse(rawSse, line)
                                 if (data == "[DONE]") break
                                 val obj = runCatching { JsonParser.parseString(data).asJsonObject }.getOrNull() ?: continue
                                 // 单个事件的字段类型异常不应废掉整条流，只跳过该事件；

@@ -209,7 +209,7 @@ class AnthropicAdapter @Inject constructor(
                         if (!line.startsWith("data:")) continue
                         val data = line.removePrefix("data:").trim()
                         if (data.isEmpty()) continue
-                        rawSse.append(line).append('\n')
+                        AILogger.appendRawSse(rawSse, line)
                         val obj = runCatching { JsonParser.parseString(data).asJsonObject }.getOrNull() ?: continue
                         // 单行 SSE 解析：不同上游/模型的字段类型偶有出入，Gson 的 getAsJsonObject/getAsJsonArray
                         // 在类型不符时会直接抛 ClassCastException，asString/asInt 对非原始值抛 UnsupportedOperationException。

@@ -333,7 +333,7 @@ class OpenAIAdapter @Inject constructor(
                         if (!line.startsWith("data:")) continue
                         val data = line.removePrefix("data:").trim()
                         if (data.isEmpty()) continue
-                        rawSse.append(line).append('\n')
+                        AILogger.appendRawSse(rawSse, line)
                         if (data == "[DONE]") break
                         val obj = runCatching { JsonParser.parseString(data).asJsonObject }.getOrNull() ?: continue
                         obj.get("error")?.takeIf { it.isJsonObject }?.asJsonObject?.let { errObj ->
@@ -476,7 +476,7 @@ class OpenAIAdapter @Inject constructor(
                                 if (!line.startsWith("data:")) continue
                                 val data = line.removePrefix("data:").trim()
                                 if (data.isEmpty()) continue
-                                rawSse.append(line).append('\n')
+                                AILogger.appendRawSse(rawSse, line)
                                 // 官方 Responses 不发 [DONE]，但部分兼容服务会补发，收到即视为流结束。
                                 if (data == "[DONE]") break
                                 val obj = runCatching { JsonParser.parseString(data).asJsonObject }.getOrNull() ?: continue

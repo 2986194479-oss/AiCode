@@ -22,7 +22,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -83,11 +82,11 @@ class RemoteSshEngine @Inject constructor(
                 runCatching { session.close() }
             }
         }
-        val reader = BufferedReader(InputStreamReader(session.inputStream))
+        val reader = BoundedLineReader(InputStreamReader(session.inputStream))
         try {
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                emit(CommandEvent.Line(line!!))
+            while (true) {
+                val line = reader.readLine() ?: break
+                emit(CommandEvent.Line(if (line.truncated) "${line.text}\n$LINE_TRUNCATED_NOTE" else line.text))
             }
             val exitCode = session.exitStatus
             watchdog.cancel()
@@ -180,11 +179,11 @@ class RemoteSshEngine @Inject constructor(
                         runCatching { session.close() }
                     }
                 }
-                val reader = BufferedReader(InputStreamReader(session.inputStream))
+                val reader = BoundedLineReader(InputStreamReader(session.inputStream))
                 try {
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        output.append(line!!)
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        output.append(if (line.truncated) "${line.text}\n$LINE_TRUNCATED_NOTE" else line.text)
                         output.append("\n")
                     }
                 } finally {
@@ -194,11 +193,11 @@ class RemoteSshEngine @Inject constructor(
                 // 并发读 stderr 合并进 output：本地引擎 redirectErrorStream(true) 是合并语义，
                 // 远程若不合并，命令报错（如 rg 未安装时的 command not found）只写 stderr 会被静默丢弃。
                 val stderrJob = launch {
-                    val errReader = BufferedReader(InputStreamReader(session.errorStream))
+                    val errReader = BoundedLineReader(InputStreamReader(session.errorStream))
                     try {
-                        var errLine: String?
-                        while (errReader.readLine().also { errLine = it } != null) {
-                            output.append(errLine!!)
+                        while (true) {
+                            val errLine = errReader.readLine() ?: break
+                            output.append(if (errLine.truncated) "${errLine.text}\n$LINE_TRUNCATED_NOTE" else errLine.text)
                             output.append("\n")
                         }
                     } finally {

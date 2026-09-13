@@ -25,8 +25,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
+import java.io.Closeable
 import java.io.InputStreamReader
+import java.io.Reader
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -68,6 +69,65 @@ data class ProotInvocation(
      */
     val ptyEnvArray: Array<String>
         get() = (System.getenv() + env).map { "${it.key}=${it.value}" }.toTypedArray()
+}
+
+/**
+ * 容器命令单行输出上限（字符）。`BufferedReader.readLine()` 遇到超长单行（命令把二进制/大文件
+ * dump 到 stdout，如 `cat` 可执行文件、`base64` 大文件）会把整行拼进内存，设备上直接 OOM。
+ * 超过上限即截断、丢弃该行余下内容，保证内存有界。
+ */
+internal const val MAX_STREAM_LINE_CHARS = 64 * 1024
+
+/** 超长单行被截断后追加的提示行。 */
+internal const val LINE_TRUNCATED_NOTE = "[该行输出过长，已截断]"
+
+/** 一行输出；[truncated] 为 true 表示该行超过 [MAX_STREAM_LINE_CHARS] 被截断。 */
+internal class StreamLine(val text: String, val truncated: Boolean)
+
+/**
+ * 逐行读取 [reader]，分行语义与 [java.io.BufferedReader.readLine] 一致（`\n` / `\r` / `\r\n`），
+ * 但单行长度封顶 [maxChars]：达到上限后不再累积、继续消费该行余下内容并丢弃，避免超长单行 OOM。
+ */
+internal class BoundedLineReader(
+    private val reader: Reader,
+    private val maxChars: Int = MAX_STREAM_LINE_CHARS
+) : Closeable {
+    private val buf = CharArray(8192)
+    private var pos = 0
+    private var len = 0
+    private var skipLf = false
+
+    override fun close() = reader.close()
+
+    fun readLine(): StreamLine? {
+        val sb = StringBuilder()
+        var truncated = false
+        var sawContent = false
+        while (true) {
+            if (pos >= len) {
+                if (len == -1) return if (sawContent) StreamLine(sb.toString(), truncated) else null
+                len = reader.read(buf)
+                pos = 0
+                continue
+            }
+            val c = buf[pos++]
+            if (skipLf) {
+                skipLf = false
+                if (c == '\n') continue
+            }
+            when (c) {
+                '\n' -> return StreamLine(sb.toString(), truncated)
+                '\r' -> {
+                    skipLf = true
+                    return StreamLine(sb.toString(), truncated)
+                }
+                else -> {
+                    sawContent = true
+                    if (sb.length < maxChars) sb.append(c) else truncated = true
+                }
+            }
+        }
+    }
 }
 
 @Singleton
@@ -226,11 +286,11 @@ class LinuxContainerEngine @Inject constructor(
                 runCatching { process.destroyForcibly() }
             }
         }
-        val reader = BufferedReader(InputStreamReader(process.inputStream))
+        val reader = BoundedLineReader(InputStreamReader(process.inputStream))
         try {
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                emit(CommandEvent.Line(line!!))
+            while (true) {
+                val line = reader.readLine() ?: break
+                emit(CommandEvent.Line(if (line.truncated) "${line.text}\n$LINE_TRUNCATED_NOTE" else line.text))
             }
             val exitCode = process.waitFor()
             watchdog.cancel()
@@ -366,11 +426,11 @@ class LinuxContainerEngine @Inject constructor(
             try {
                 coroutineScope {
                     val watchdog = launchKillWatchdog(this, process, effectiveTimeout, timedOut, command)
-                    val reader = BufferedReader(InputStreamReader(process.inputStream))
+                    val reader = BoundedLineReader(InputStreamReader(process.inputStream))
                     try {
-                        var line: String?
-                        while (reader.readLine().also { line = it } != null) {
-                            output.append(line!!)
+                        while (true) {
+                            val line = reader.readLine() ?: break
+                            output.append(if (line.truncated) "${line.text}\n$LINE_TRUNCATED_NOTE" else line.text)
                             output.append("\n")
                         }
                         exitCode = process.waitFor()
