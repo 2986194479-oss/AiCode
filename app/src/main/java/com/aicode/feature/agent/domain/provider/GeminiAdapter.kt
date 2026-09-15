@@ -28,6 +28,7 @@ class GeminiAdapter @Inject constructor(
 ) : AIProvider {
 
     override var apiKey = ""
+    override var keySwitcher: (suspend (Throwable, String, Set<String>) -> KeySwitchOutcome?)? = null
     override var baseUrl = "https://generativelanguage.googleapis.com/"
     override var useFullUrl = false
     override var useResponseApi = false
@@ -82,8 +83,11 @@ class GeminiAdapter @Inject constructor(
         }
         val seq = AILogger.logRequest(logSessionId, "Gemini", model, "POST", url, request)
 
+        val triedKeys = mutableSetOf(apiKey)
         val response = try {
-            retryStaircase {
+            retryStaircase(
+                onKeyFailure = { e, _ -> switchKeyOnFailure(e, triedKeys) != null }
+            ) {
                 api.generateContent(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
             }
         } catch (e: CancellationException) {
@@ -194,7 +198,15 @@ class GeminiAdapter @Inject constructor(
         val rawSse = StringBuilder()
 
         try {
+            val triedKeys = mutableSetOf(apiKey)
             streamWithStaircaseRetry(
+                onKeyFailure = { e, canRetry ->
+                    val outcome = switchKeyOnFailure(e, triedKeys)
+                    if (outcome != null && canRetry) {
+                        emit(AIStreamChunk.KeySwitched(outcome.newIndex, outcome.total))
+                        true
+                    } else false
+                },
                 attemptOnce = { onContent ->
                 val textBuilder = StringBuilder()
                 val toolCalls = mutableListOf<ToolCall>()
@@ -370,8 +382,11 @@ class GeminiAdapter @Inject constructor(
         val request = buildInteractionsRequest(systemPrompt, messages, tools, reasoningEffort, stream = false)
         val seq = AILogger.logRequest(logSessionId, "Gemini", model, "POST", url, request)
 
+        val triedKeys = mutableSetOf(apiKey)
         val response = try {
-            retryStaircase {
+            retryStaircase(
+                onKeyFailure = { e, _ -> switchKeyOnFailure(e, triedKeys) != null }
+            ) {
                 api.createInteraction(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
             }
         } catch (e: CancellationException) {
@@ -422,7 +437,15 @@ class GeminiAdapter @Inject constructor(
         // 累积原始 SSE，整轮结束（或失败）后整体落盘，避免高频写盘。
         val rawSse = StringBuilder()
         try {
+            val triedKeys = mutableSetOf(apiKey)
             streamWithStaircaseRetry(
+                onKeyFailure = { e, canRetry ->
+                    val outcome = switchKeyOnFailure(e, triedKeys)
+                    if (outcome != null && canRetry) {
+                        emit(AIStreamChunk.KeySwitched(outcome.newIndex, outcome.total))
+                        true
+                    } else false
+                },
                 attemptOnce = { onContent ->
                     val acc = GeminiInteractionsStreamAccumulator()
 

@@ -225,7 +225,6 @@ class GenerateImageTool @Inject constructor(
                 extraHeaders = resolveCustomHeaders(provider.customHeaders, context.sessionId, activeApiKey),
                 request = request
             )
-            keyRotator.reportSuccess(provider.id, activeApiKey)
             AILogger.logResponse(context.sessionId, provider.id, response, seq)
             buildSuccess(response, n, outputPath, model)
         } catch (e: CancellationException) {
@@ -358,7 +357,6 @@ class GenerateImageTool @Inject constructor(
                     extraHeaders = resolveCustomHeaders(provider.customHeaders, sessionId, apiKey),
                     request = request
                 )
-                keyRotator.reportSuccess(provider.id, apiKey)
                 AILogger.logResponse(sessionId, provider.id, response, lastSeq)
                 val status = response.get("status")?.takeIf { it.isJsonPrimitive }?.asString
                 if (status == "failed" || status == "cancelled" || status == "budget_exceeded") {
@@ -440,7 +438,6 @@ class GenerateImageTool @Inject constructor(
                     extraHeaders = resolveCustomHeaders(provider.customHeaders, sessionId, apiKey),
                     request = request
                 )
-                keyRotator.reportSuccess(provider.id, apiKey)
                 AILogger.logResponse(sessionId, provider.id, response, lastSeq)
                 val beforeCount = agentImages.size
                 extractGenerateContentImageData(response).forEach { base64 ->
