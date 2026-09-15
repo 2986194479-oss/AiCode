@@ -1,6 +1,7 @@
 package com.aicode.feature.workspace.domain
 
 import java.io.File
+import java.io.InputStream
 import java.nio.charset.Charset
 
 /** 目录条目信息，供 [FileAccessProvider.listFiles] 返回。 */
@@ -93,6 +94,13 @@ interface FileAccessProvider {
      * 文本内容仍用 [writeFile]。
      */
     fun writeBytes(path: String, bytes: ByteArray, overwrite: Boolean = true)
+
+    /**
+     * 从 [input] 流式写入文件，返回写入的字节数；内容不整体驻留内存。
+     * 父目录不存在则自动创建。[overwrite] 为 false 且文件已存在时抛 [FileAlreadyExistsException]。
+     * 供上传大附件等场景使用。
+     */
+    fun writeStream(path: String, input: InputStream, overwrite: Boolean = true): Long
 
     /**
      * 把文件复制到本地临时文件并返回其 [File]。

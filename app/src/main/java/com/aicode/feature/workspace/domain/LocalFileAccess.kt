@@ -4,6 +4,7 @@ import com.aicode.core.util.FileLogger
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.nio.charset.Charset
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.NoSuchFileException
@@ -130,6 +131,19 @@ class LocalFileAccess @Inject constructor(
             throw IOException("write verification failed: ${file.absolutePath} expected ${bytes.size} bytes, found $actual")
         }
         FileLogger.i(TAG, "写入: '$path' -> ${file.absolutePath} (${bytes.size} 字节)")
+    }
+
+    override fun writeStream(path: String, input: InputStream, overwrite: Boolean): Long {
+        val file = resolve(path)
+        if (file.exists() && !overwrite) throw FileAlreadyExistsException(file)
+        file.parentFile?.mkdirs()
+        return try {
+            FileOutputStream(file).use { out -> input.copyTo(out) }
+        } catch (e: Exception) {
+            // 写入中途失败（如源流读取出错、空间不足）会留下半截文件，清掉再抛出
+            file.delete()
+            throw e
+        }
     }
 
     override fun copyToLocal(path: String): File = resolve(path)

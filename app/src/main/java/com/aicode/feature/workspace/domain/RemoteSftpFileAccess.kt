@@ -8,8 +8,11 @@ import com.aicode.feature.workspace.domain.WorkspacePathMapper.Companion.CONTAIN
 import kotlinx.coroutines.runBlocking
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.io.InputStreamReader
+import java.io.OutputStream
 import java.nio.charset.Charset
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.NoSuchFileException
@@ -115,6 +118,59 @@ class RemoteSftpFileAccess @Inject constructor(
             }
         }
     }
+
+    /**
+     * 把 [content] 经远端命令的 stdin 送入并返回退出码。
+     * 用于 base64 大内容落盘：命令行参数上限（ARG_MAX）远小于附件体积，走 stdin 不受此限。
+     */
+    private fun execWithStdin(command: String, content: ByteArray): Int = runBlocking {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val session = try {
+                connection.startExecSessionWithStdin(command)
+            } catch (e: Exception) {
+                FileLogger.w(TAG, friendlySshError(e), e)
+                return@withContext -1
+            }
+            try {
+                session.outputStream.use { out ->
+                    out.write(content)
+                    out.flush()
+                }
+                BufferedReader(InputStreamReader(session.inputStream)).readText()
+                runCatching { session.close() }
+                session.exitStatus ?: -1
+            } catch (e: Exception) {
+                runCatching { session.close() }
+                FileLogger.w(TAG, "命令执行异常: $command", e)
+                -1
+            }
+        }
+    }
+
+    /**
+     * 把 [write] 产出的内容经远端命令的 stdin 流式送入，返回 (退出码, 写入字节数)。
+     * 与 [execWithStdin] 的区别是不预先持有完整内容：调用方在 [write] 里边读边写，内存占用恒定。
+     */
+    private fun execWithStdinStream(command: String, write: (OutputStream) -> Long): Pair<Int, Long> =
+        runBlocking {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val session = try {
+                    connection.startExecSessionWithStdin(command)
+                } catch (e: Exception) {
+                    throw RuntimeException(friendlySshError(e), e)
+                }
+                try {
+                    var written = 0L
+                    session.outputStream.use { out -> written = write(out) }
+                    BufferedReader(InputStreamReader(session.inputStream)).readText()
+                    runCatching { session.close() }
+                    (session.exitStatus ?: -1) to written
+                } catch (e: Exception) {
+                    runCatching { session.close() }
+                    throw e
+                }
+            }
+        }
 
     override fun readFile(path: String): String {
         val remote = toRemotePath(path)
@@ -252,32 +308,67 @@ class RemoteSftpFileAccess @Inject constructor(
     override fun writeBytes(path: String, bytes: ByteArray, overwrite: Boolean) {
         val remote = toRemotePath(path)
         if (exists(path) && !overwrite) throw FileAlreadyExistsException(File(remote))
-        // 与 writeFile 相同的 base64 分块落盘：整段作单个 printf 参数会撞 exec 的 MAX_ARG_STRLEN(128KB) 上限。
+        ensureParentDir(remote)
+        val b64 = java.util.Base64.getEncoder().encodeToString(bytes)
+        val redirect = if (overwrite) ">" else ">>"
+        val exit = execWithStdin("base64 -d $redirect ${shellQuote(remote)}", b64.toByteArray(Charsets.UTF_8))
+        if (exit != 0) throw IOException("写入远程文件失败（退出码=$exit）：$remote")
+    }
+
+    override fun writeStream(path: String, input: InputStream, overwrite: Boolean): Long {
+        val remote = toRemotePath(path)
+        if (exists(path) && !overwrite) throw FileAlreadyExistsException(File(remote))
+        ensureParentDir(remote)
+        // 先落到 .aicode-part 再 mv：传输中途断开时不会在目标位置留下半截文件
+        val tmp = "$remote.aicode-part"
+        val redirect = if (overwrite) ">" else ">>"
+        val (exit, written) = try {
+            execWithStdinStream("base64 -d $redirect ${shellQuote(tmp)}") { out ->
+                java.util.Base64.getEncoder().wrap(out).use { enc -> input.copyTo(enc) }
+            }
+        } catch (e: Exception) {
+            execExitCode("rm -f ${shellQuote(tmp)}")
+            throw e
+        }
+        if (exit != 0) {
+            execExitCode("rm -f ${shellQuote(tmp)}")
+            throw IOException("写入远程文件失败（退出码=$exit）：$remote")
+        }
+        val mvExit = execExitCode("mv -f ${shellQuote(tmp)} ${shellQuote(remote)}")
+        if (mvExit != 0) {
+            execExitCode("rm -f ${shellQuote(tmp)}")
+            throw IOException("移动远程临时文件失败（退出码=$mvExit）：$remote")
+        }
+        return written
+    }
+
+    /** 确保远程文件的父目录存在；mkdir 失败时直接报错，避免后续写入落到不存在的目录。 */
+    private fun ensureParentDir(remote: String) {
         val parent = remote.substringBeforeLast('/', "")
         if (parent.isNotEmpty()) execExitCode("mkdir -p ${shellQuote(parent)}")
-        val b64 = java.util.Base64.getEncoder().encodeToString(bytes)
-        if (b64.isEmpty()) {
-            if (overwrite) {
-                val exit = execExitCode(": > ${shellQuote(remote)}")
-                if (exit != 0) throw IOException("writeBytes 截断失败 退出码=$exit: $remote")
-            }
-            return
-        }
-        val redirect = if (overwrite) ">" else ">>"
-        b64.chunked(BASE64_CHUNK).forEachIndexed { i, chunk ->
-            val op = if (i == 0) redirect else ">>"
-            val exit = execExitCode("printf %s ${shellQuote(chunk)} | base64 -d $op ${shellQuote(remote)}")
-            if (exit != 0) throw IOException("writeBytes 分块写入失败 退出码=$exit: $remote")
-        }
     }
 
     override fun copyToLocal(path: String): File {
         val remote = toRemotePath(path)
-        val tempFile = File.createTempFile("aicode_remote_", ".copy")
-        return try {
-            // base64 解码到本地临时文件
-            val b64 = execSync("base64 ${shellQuote(remote)} 2>/dev/null")
-            tempFile.writeBytes(java.util.Base64.getMimeDecoder().decode(b64))
+        // 先确认远端文件存在：base64 失败时 stdout 为空，会把空内容解码成空文件而假装成功
+        if (!exists(path)) throw NoSuchFileException(File(remote))
+        val tempFile = File.createTempFile("aicode_remote_", ".copy").apply { deleteOnExit() }
+        return runCatching {
+            runBlocking {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val session = connection.startExecSession("base64 ${shellQuote(remote)} 2>/dev/null")
+                    try {
+                        java.util.Base64.getMimeDecoder().wrap(session.inputStream).use { decoded ->
+                            FileOutputStream(tempFile).use { out -> decoded.copyTo(out) }
+                        }
+                        runCatching { session.close() }
+                    } catch (e: Exception) {
+                        runCatching { session.close() }
+                        throw e
+                    }
+                }
+            }
+
             tempFile
         } catch (e: Exception) {
             // 用完即删：临时文件不依赖 deleteOnExit（只在进程退出清），失败路径也回收，避免长会话累积。
