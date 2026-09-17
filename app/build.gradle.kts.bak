@@ -352,11 +352,6 @@ dependencies {
 
     // Lucide Icons
     implementation("br.com.devsrsouza.compose.icons:feather:1.1.1")
-    // ===== AiCode MCP 服务端（新增）=====
-    implementation("io.ktor:ktor-server-core:3.0.3")
-    implementation("io.ktor:ktor-server-cio:3.0.3")
-    implementation("io.ktor:ktor-server-content-negotiation:3.0.3")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
 
     // 可拖拽排序列表（长按拖拽手势，提供商排序用）
     implementation("sh.calvin.reorderable:reorderable:3.1.0")

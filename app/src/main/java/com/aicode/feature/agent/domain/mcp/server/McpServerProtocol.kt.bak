@@ -1,0 +1,127 @@
+package com.aicode.feature.agent.domain.mcp.server
+
+import com.aicode.feature.agent.domain.mcp.McpToolDescriptor
+import com.aicode.feature.agent.domain.mcp.McpToolsListResult
+import com.aicode.feature.agent.domain.tool.ToolRegistry
+import com.aicode.core.util.FileLogger
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * MCP 服务端协议处理器：把 App 内 [ToolRegistry] 的工具桥接成 MCP 协议响应。
+ *
+ * 支持三类方法：
+ * - initialize：握手，返回服务端能力与名称
+ * - tools/list：列出可用工具（转成 MCP 的 McpToolDescriptor）
+ * - tools/call：执行某个工具并返回结果
+ */
+@Singleton
+class McpServerProtocol @Inject constructor(
+    private val toolRegistry: ToolRegistry,
+    private val json: Json
+) {
+    private companion object {
+        const val TAG = "McpServerProtocol"
+        const val PROTOCOL_VERSION = "2024-11-05"
+        const val SERVER_NAME = "aicode-mcp-server"
+        const val SERVER_VERSION = "1.0.0"
+    }
+
+    /** 处理一个 JSON-RPC 请求，返回响应 JSON（通知返回 null）。 */
+    suspend fun handle(request: JsonObject): JsonObject? {
+        val id = request["id"]?.jsonPrimitive?.content
+        val method = request["method"]?.jsonPrimitive?.content ?: return null
+        val params = request["params"]?.jsonObject
+        FileLogger.i(TAG, "收到 MCP 请求: method=$method")
+        return when (method) {
+            "initialize" -> result(id, initializeResult())
+            "notifications/initialized" -> null
+            "tools/list" -> result(id, toolsListResult())
+            "tools/call" -> result(id, toolsCallResult(params))
+            "ping" -> result(id, buildJsonObject { })
+            else -> error(id, -32601, "Method not found: $method")
+        }
+    }
+
+    private fun initializeResult(): JsonObject = buildJsonObject {
+        put("protocolVersion", JsonPrimitive(PROTOCOL_VERSION))
+        put("capabilities", buildJsonObject {
+            put("tools", buildJsonObject { })
+        })
+        put("serverInfo", buildJsonObject {
+            put("name", JsonPrimitive(SERVER_NAME))
+            put("version", JsonPrimitive(SERVER_VERSION))
+        })
+    }
+
+    private fun toolsListResult(): JsonObject {
+        val tools = toolRegistry.getAvailableTools().map { tool ->
+            buildJsonObject {
+                put("name", JsonPrimitive(tool.name))
+                put("description", JsonPrimitive(tool.description ?: tool.name))
+                put("inputSchema", buildJsonObject {
+                    put("type", JsonPrimitive("object"))
+                    put("properties", buildJsonObject { })
+                })
+            }
+        }
+        return buildJsonObject {
+            put("tools", kotlinx.serialization.json.JsonArray(tools))
+        }
+    }
+
+    private suspend fun toolsCallResult(params: JsonObject?): JsonObject {
+        val name = params?.get("name")?.jsonPrimitive?.content
+            ?: return errorResult("缺少工具名 name")
+        val args: JsonObject = params["arguments"]?.jsonObject ?: buildJsonObject { }
+        val tool = toolRegistry.getTool(name)
+            ?: return errorResult("工具不存在: $name")
+        return try {
+            val result = tool.execute(args.toString())
+            buildJsonObject {
+                put("content", kotlinx.serialization.json.JsonArray(listOf(
+                    buildJsonObject {
+                        put("type", JsonPrimitive("text"))
+                        put("text", JsonPrimitive(result.toString()))
+                    }
+                )))
+                put("isError", JsonPrimitive(false))
+            }
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "工具执行失败: $name", e)
+            errorResult("工具执行失败: ${e.message}")
+        }
+    }
+
+    private fun errorResult(message: String): JsonObject = buildJsonObject {
+        put("content", kotlinx.serialization.json.JsonArray(listOf(
+            buildJsonObject {
+                put("type", JsonPrimitive("text"))
+                put("text", JsonPrimitive(message))
+            }
+        )))
+        put("isError", JsonPrimitive(true))
+    }
+
+    private fun result(id: String?, result: JsonObject): JsonObject = buildJsonObject {
+        put("jsonrpc", JsonPrimitive("2.0"))
+        if (id != null) put("id", JsonPrimitive(id))
+        put("result", result)
+    }
+
+    private fun error(id: String?, code: Int, message: String): JsonObject = buildJsonObject {
+        put("jsonrpc", JsonPrimitive("2.0"))
+        if (id != null) put("id", JsonPrimitive(id))
+        put("error", buildJsonObject {
+            put("code", JsonPrimitive(code))
+            put("message", JsonPrimitive(message))
+        })
+    }
+}
