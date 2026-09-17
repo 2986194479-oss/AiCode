@@ -38,21 +38,57 @@ const val MAX_NETWORK_RETRIES = 6
 const val FIRST_BYTE_TIMEOUT_MS = 300_000L
 
 /**
- * 启动首字节超时 watchdog（作为当前协程的子协程）：在 [FIRST_BYTE_TIMEOUT_MS] 后
+ * 启动首字节超时 watchdog（作为当前协程的子协程）：在 [timeoutMs] 后
  * 若 [isFirstByteReceived] 仍为 false，则调用 [close]（通常是关闭 ResponseBody），
  * 强制读取抛出 IOException 以被重试机制捕获。
  *
+ * [timeoutMs] <= 0 表示不限制，此时不启动计时。
  * 调用方应在收到首个内容块后取消返回的 [Job]。
  */
 suspend fun launchFirstByteWatchdog(
+    timeoutMs: Long,
     close: () -> Unit,
     isFirstByteReceived: () -> Boolean
 ): Job = CoroutineScope(coroutineContext[Job]!!).launch {
-    delay(FIRST_BYTE_TIMEOUT_MS)
+    if (timeoutMs <= 0) return@launch
+    delay(timeoutMs)
     if (!isFirstByteReceived()) {
         runCatching { close() }
     }
 }
+
+/**
+ * 流式响应「数据块间隔」watchdog：相邻两个数据块之间超过 [timeoutMs] 未到达即调用 [close]，
+ * 使阻塞中的读取抛出 IOException，交给重试机制处理。
+ *
+ * 每收到一个数据块调用一次 [touch] 重新计时；流结束（正常或异常）时调用 [cancel]。
+ * [timeoutMs] <= 0 表示不限制，此时两个方法均为空操作。
+ */
+class StreamIdleWatchdog(
+    private val scope: CoroutineScope,
+    private val timeoutMs: Long,
+    private val close: () -> Unit
+) {
+    private var timer: Job? = null
+
+    fun touch() {
+        if (timeoutMs <= 0) return
+        timer?.cancel()
+        timer = scope.launch {
+            delay(timeoutMs)
+            runCatching { close() }
+        }
+    }
+
+    fun cancel() {
+        timer?.cancel()
+        timer = null
+    }
+}
+
+/** 在当前协程下创建 [StreamIdleWatchdog]；[timeoutMs] <= 0 时创建的实例不做任何事。 */
+suspend fun launchStreamIdleWatchdog(timeoutMs: Long, close: () -> Unit): StreamIdleWatchdog =
+    StreamIdleWatchdog(CoroutineScope(coroutineContext[Job]!!), timeoutMs, close)
 
 private val TRANSIENT_MESSAGES = listOf(
     "load failed",

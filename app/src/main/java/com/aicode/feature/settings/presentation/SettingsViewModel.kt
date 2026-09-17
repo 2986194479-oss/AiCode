@@ -451,6 +451,12 @@ class SettingsViewModel @Inject constructor(
     private val _startupSessionMode = MutableStateFlow(StartupSessionMode.NEW_SESSION)
     val startupSessionMode: StateFlow<StartupSessionMode> = _startupSessionMode.asStateFlow()
 
+    private val _firstByteTimeoutSec = MutableStateFlow(300)
+    val firstByteTimeoutSec: StateFlow<Int> = _firstByteTimeoutSec.asStateFlow()
+
+    private val _streamIdleTimeoutSec = MutableStateFlow(0)
+    val streamIdleTimeoutSec: StateFlow<Int> = _streamIdleTimeoutSec.asStateFlow()
+
     private val _themeMode = MutableStateFlow(AppThemeMode.AUTO)
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
 
@@ -716,6 +722,18 @@ class SettingsViewModel @Inject constructor(
             launch {
                 generalSettingsRepository.startupSessionModeFlow.collectLatest {
                     _startupSessionMode.value = it
+                }
+            }
+
+            launch {
+                generalSettingsRepository.firstByteTimeoutSecFlow.collectLatest {
+                    _firstByteTimeoutSec.value = it
+                }
+            }
+
+            launch {
+                generalSettingsRepository.streamIdleTimeoutSecFlow.collectLatest {
+                    _streamIdleTimeoutSec.value = it
                 }
             }
 
@@ -1257,6 +1275,20 @@ class SettingsViewModel @Inject constructor(
     fun setStartupSessionMode(mode: StartupSessionMode) {
         viewModelScope.launch {
             generalSettingsRepository.setStartupSessionMode(mode)
+        }
+    }
+
+    /** 流式请求首字超时（秒）；0 表示不限制。 */
+    fun setFirstByteTimeoutSec(sec: Int) {
+        viewModelScope.launch {
+            generalSettingsRepository.setFirstByteTimeoutSec(sec)
+        }
+    }
+
+    /** 流式响应相邻数据块间隔超时（秒）；0 表示不限制。 */
+    fun setStreamIdleTimeoutSec(sec: Int) {
+        viewModelScope.launch {
+            generalSettingsRepository.setStreamIdleTimeoutSec(sec)
         }
     }
 

@@ -3,6 +3,7 @@ package com.aicode.feature.settings.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,8 +27,8 @@ enum class StartupSessionMode {
 /**
  * 「通用设置」里的用户偏好。
  *
- * 目前两项：拉取模型成功后是否自动移除远端已不存在的本地模型（默认开启），
- * 以及启动时进入新会话还是最近会话（默认新开会话）。
+ * 目前三项：拉取模型成功后是否自动移除远端已不存在的本地模型（默认开启）、
+ * 启动时进入新会话还是最近会话（默认新开会话），以及首字 / 数据块间隔超时（秒）。
  * DataStore 用法与 [KeepaliveSettingsRepository] 一致。
  */
 @Singleton
@@ -37,6 +38,11 @@ class GeneralSettingsRepository @Inject constructor(
     private companion object {
         val AUTO_REMOVE_STALE_MODELS_KEY = booleanPreferencesKey("auto_remove_stale_models")
         val STARTUP_SESSION_MODE_KEY = stringPreferencesKey("startup_session_mode")
+        val FIRST_BYTE_TIMEOUT_SEC_KEY = intPreferencesKey("first_byte_timeout_sec")
+        val STREAM_IDLE_TIMEOUT_SEC_KEY = intPreferencesKey("stream_idle_timeout_sec")
+
+        /** 首字超时默认 5 分钟，与原硬编码值一致。 */
+        const val DEFAULT_FIRST_BYTE_TIMEOUT_SEC = 300
     }
 
     /** 拉取模型后自动对齐本地列表的开关流；未设置时回退到 true（默认开启）。 */
@@ -77,4 +83,37 @@ class GeneralSettingsRepository @Inject constructor(
             StartupSessionMode.entries.firstOrNull { it.name == mode } ?: StartupSessionMode.NEW_SESSION
         )
     }
+
+    /** 首字超时（秒）；0 表示不限制，未设置时回退到 300 秒。 */
+    val firstByteTimeoutSecFlow: Flow<Int> = context.generalDataStore.data.map {
+        (it[FIRST_BYTE_TIMEOUT_SEC_KEY] ?: DEFAULT_FIRST_BYTE_TIMEOUT_SEC).coerceAtLeast(0)
+    }
+
+    /** 流式响应相邻数据块间隔超时（秒）；0（默认）表示不限制。 */
+    val streamIdleTimeoutSecFlow: Flow<Int> = context.generalDataStore.data.map {
+        (it[STREAM_IDLE_TIMEOUT_SEC_KEY] ?: 0).coerceAtLeast(0)
+    }
+
+    suspend fun setFirstByteTimeoutSec(sec: Int) {
+        context.generalDataStore.edit { it[FIRST_BYTE_TIMEOUT_SEC_KEY] = sec.coerceAtLeast(0) }
+    }
+
+    suspend fun setStreamIdleTimeoutSec(sec: Int) {
+        context.generalDataStore.edit { it[STREAM_IDLE_TIMEOUT_SEC_KEY] = sec.coerceAtLeast(0) }
+    }
+
+    /** 装配 provider 前读取一次首字超时（毫秒）；0 表示不限制。 */
+    suspend fun firstByteTimeoutMs(): Long = firstByteTimeoutSecFlow.first() * 1000L
+
+    /** 装配 provider 前读取一次数据块间隔超时（毫秒）；0 表示不限制。 */
+    suspend fun streamIdleTimeoutMs(): Long = streamIdleTimeoutSecFlow.first() * 1000L
+
+    /** 备份快照：两个超时设置（秒）。 */
+    suspend fun firstByteTimeoutSecSnapshot(): Int = firstByteTimeoutSecFlow.first()
+
+    suspend fun streamIdleTimeoutSecSnapshot(): Int = streamIdleTimeoutSecFlow.first()
+
+    suspend fun restoreFirstByteTimeoutSec(sec: Int) = setFirstByteTimeoutSec(sec)
+
+    suspend fun restoreStreamIdleTimeoutSec(sec: Int) = setStreamIdleTimeoutSec(sec)
 }

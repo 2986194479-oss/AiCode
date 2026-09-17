@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,11 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
 import com.aicode.core.theme.semanticColors
 import com.aicode.core.ui.AppSwitch
+import com.aicode.core.ui.AppTextField
 import com.aicode.feature.settings.data.repository.StartupSessionMode
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Check
@@ -42,9 +47,15 @@ internal fun GeneralSettingsSection(
     autoRemoveStaleModels: Boolean,
     onToggleAutoRemoveStaleModels: (Boolean) -> Unit,
     startupSessionMode: StartupSessionMode,
-    onSelectStartupSessionMode: (StartupSessionMode) -> Unit
+    onSelectStartupSessionMode: (StartupSessionMode) -> Unit,
+    firstByteTimeoutSec: Int,
+    onSetFirstByteTimeoutSec: (Int) -> Unit,
+    streamIdleTimeoutSec: Int,
+    onSetStreamIdleTimeoutSec: (Int) -> Unit
 ) {
     var showStartupSessionSheet by remember { mutableStateOf(false) }
+    var editingFirstByteTimeout by remember { mutableStateOf(false) }
+    var editingStreamIdleTimeout by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -84,6 +95,37 @@ internal fun GeneralSettingsSection(
                 }
             )
         }
+
+        SettingsGroupHeader(text = stringResource(R.string.settings_general_network))
+        SettingsGroup {
+            SettingsRow(
+                icon = null,
+                title = stringResource(R.string.settings_first_byte_timeout),
+                subtitle = stringResource(R.string.settings_first_byte_timeout_desc),
+                onClick = { editingFirstByteTimeout = true },
+                trailing = {
+                    Text(
+                        text = timeoutLabel(firstByteTimeoutSec),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.semanticColors.subtleText
+                    )
+                }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = null,
+                title = stringResource(R.string.settings_stream_idle_timeout),
+                subtitle = stringResource(R.string.settings_stream_idle_timeout_desc),
+                onClick = { editingStreamIdleTimeout = true },
+                trailing = {
+                    Text(
+                        text = timeoutLabel(streamIdleTimeoutSec),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.semanticColors.subtleText
+                    )
+                }
+            )
+        }
     }
 
     if (showStartupSessionSheet) {
@@ -96,6 +138,80 @@ internal fun GeneralSettingsSection(
             onDismiss = { showStartupSessionSheet = false }
         )
     }
+
+    if (editingFirstByteTimeout) {
+        TimeoutInputDialog(
+            title = stringResource(R.string.settings_first_byte_timeout),
+            initialSec = firstByteTimeoutSec,
+            onConfirm = {
+                onSetFirstByteTimeoutSec(it)
+                editingFirstByteTimeout = false
+            },
+            onDismiss = { editingFirstByteTimeout = false }
+        )
+    }
+
+    if (editingStreamIdleTimeout) {
+        TimeoutInputDialog(
+            title = stringResource(R.string.settings_stream_idle_timeout),
+            initialSec = streamIdleTimeoutSec,
+            onConfirm = {
+                onSetStreamIdleTimeoutSec(it)
+                editingStreamIdleTimeout = false
+            },
+            onDismiss = { editingStreamIdleTimeout = false }
+        )
+    }
+}
+
+/** 超时值的行尾展示：0（或负数）视为不限制。 */
+@Composable
+private fun timeoutLabel(sec: Int): String =
+    if (sec <= 0) stringResource(R.string.settings_timeout_unlimited)
+    else stringResource(R.string.settings_timeout_seconds, sec)
+
+/**
+ * 超时时间输入弹窗：只接受非负整数秒，留空或填 0 即不限制。
+ */
+@Composable
+private fun TimeoutInputDialog(
+    title: String,
+    initialSec: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(if (initialSec > 0) initialSec.toString() else "") }
+    val parsed = text.trim().toIntOrNull()
+    val isValid = text.isBlank() || (parsed != null && parsed >= 0)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text(title) },
+        text = {
+            AppTextField(
+                value = text,
+                onValueChange = { input -> text = input.filter { it.isDigit() } },
+                placeholder = stringResource(R.string.settings_timeout_unlimited),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = !isValid,
+                supportingText = { Text(stringResource(R.string.settings_timeout_input_hint)) }
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(parsed ?: 0) },
+                enabled = isValid
+            ) {
+                Text(stringResource(R.string.common_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -35,6 +35,8 @@ class GeminiAdapter @Inject constructor(
     override var model = "gemini-1.5-flash"
     override var providerId = ""
     override var logSessionId: String? = null
+    override var firstByteTimeoutMs: Long = FIRST_BYTE_TIMEOUT_MS
+    override var streamIdleTimeoutMs: Long = 0L
 
     /** 自定义请求头：占位符替换后写出，完全覆盖同名默认头。 */
     override var customHeaders: Map<String, String> = emptyMap()
@@ -221,9 +223,10 @@ class GeminiAdapter @Inject constructor(
                 val body = api.streamGenerateContent(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
 
                 body.use { rb ->
-                    // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。
+                    // 首字节超时 watchdog：超时内未收到首个内容块则关闭流，触发可重试的 IOException。
                     val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                    val watchdog = launchFirstByteWatchdog({ rb.close() }) { firstByteReceived.get() }
+                    val watchdog = launchFirstByteWatchdog(firstByteTimeoutMs, { rb.close() }) { firstByteReceived.get() }
+                    val idleWatchdog = launchStreamIdleWatchdog(streamIdleTimeoutMs) { rb.close() }
                     val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                         runCatching { rb.close() }
                     }
@@ -233,6 +236,7 @@ class GeminiAdapter @Inject constructor(
                             coroutineContext.ensureActive()
                             val line = reader.readLine()
                                 ?: throw IOException("SSE 流被中断（疑似网络断开）")
+                            idleWatchdog.touch()
                             if (!line.startsWith("data:")) continue
                             val data = line.removePrefix("data:").trim()
                             if (data.isEmpty()) continue
@@ -301,6 +305,7 @@ class GeminiAdapter @Inject constructor(
                         }
                     } finally {
                         watchdog.cancel()
+                        idleWatchdog.cancel()
                         closeHandle?.dispose()
                     }
                 }
@@ -457,9 +462,10 @@ class GeminiAdapter @Inject constructor(
                     )
 
                     body.use { rb ->
-                        // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。
+                        // 首字节超时 watchdog：超时内未收到首个内容块则关闭流，触发可重试的 IOException。
                         val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                        val watchdog = launchFirstByteWatchdog({ rb.close() }) { firstByteReceived.get() }
+                        val watchdog = launchFirstByteWatchdog(firstByteTimeoutMs, { rb.close() }) { firstByteReceived.get() }
+                        val idleWatchdog = launchStreamIdleWatchdog(streamIdleTimeoutMs) { rb.close() }
                         val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                             runCatching { rb.close() }
                         }
@@ -469,6 +475,7 @@ class GeminiAdapter @Inject constructor(
                                 coroutineContext.ensureActive()
                                 val line = reader.readLine()
                                     ?: throw IOException("SSE 流被中断：interaction 未到终态（疑似网络断开）")
+                                idleWatchdog.touch()
                                 if (!line.startsWith("data:")) continue
                                 val data = line.removePrefix("data:").trim()
                                 if (data.isEmpty()) continue
@@ -504,6 +511,7 @@ class GeminiAdapter @Inject constructor(
                             }
                         } finally {
                             watchdog.cancel()
+                            idleWatchdog.cancel()
                             closeHandle?.dispose()
                         }
                     }

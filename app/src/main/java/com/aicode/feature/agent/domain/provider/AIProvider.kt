@@ -165,6 +165,18 @@ interface AIProvider {
     var temperature: Float?
 
     /**
+     * 流式请求等待首个内容块的上限（毫秒），调用前由工作流按「通用设置 → 网络」写入。
+     * 默认 5 分钟；0 表示不限制，此时仅靠连接超时与手动取消兜底。
+     */
+    var firstByteTimeoutMs: Long
+
+    /**
+     * 流式响应中相邻两个数据块之间的最大等待（毫秒），0（默认）表示不限制。
+     * 非 0 时超过该间隔未收到任何数据即关闭流，触发可重试的 IOException。
+     */
+    var streamIdleTimeoutMs: Long
+
+    /**
      * 单轮补全。[tools] 会以提供商的 function-calling 格式真正发给模型，
      * 模型若决定调用工具，结果会出现在返回的 [AIResponse.toolCalls] 中。
      * [reasoningEffort] 为思考强度（"low"/"medium"/"high"），仅 OpenAI 系生效；

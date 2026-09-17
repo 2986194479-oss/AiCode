@@ -44,6 +44,8 @@ class AnthropicAdapter @Inject constructor(
     override var model = "claude-3-5-sonnet-20241022"
     override var providerId = ""
     override var logSessionId: String? = null
+    override var firstByteTimeoutMs: Long = FIRST_BYTE_TIMEOUT_MS
+    override var streamIdleTimeoutMs: Long = 0L
 
     /** 是否启用显式缓存断点（cache_control）。默认开启；第三方兼容网关严格校验未知字段时由设置项关闭。 */
     var cacheBreakpointsEnabled: Boolean = true
@@ -202,9 +204,10 @@ class AnthropicAdapter @Inject constructor(
             val body = api.streamMessage(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
 
             body.use { rb ->
-                // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。
+                // 首字节超时 watchdog：超时内未收到首个内容块则关闭流，触发可重试的 IOException。
                 val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                val watchdog = launchFirstByteWatchdog({ rb.close() }) { firstByteReceived.get() }
+                val watchdog = launchFirstByteWatchdog(firstByteTimeoutMs, { rb.close() }) { firstByteReceived.get() }
+                val idleWatchdog = launchStreamIdleWatchdog(streamIdleTimeoutMs) { rb.close() }
                 val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                     runCatching { rb.close() }
                 }
@@ -218,6 +221,7 @@ class AnthropicAdapter @Inject constructor(
                         coroutineContext.ensureActive()
                         val line = reader.readLine()
                             ?: throw IOException("SSE 流被中断：未收到 message_stop 结束标记（疑似网络断开）")
+                        idleWatchdog.touch()
                         if (!line.startsWith("data:")) continue
                         val data = line.removePrefix("data:").trim()
                         if (data.isEmpty()) continue
@@ -333,6 +337,7 @@ class AnthropicAdapter @Inject constructor(
                     }
                 } finally {
                     watchdog.cancel()
+                    idleWatchdog.cancel()
                     closeHandle?.dispose()
                 }
             }

@@ -42,6 +42,7 @@ import com.aicode.feature.agent.presentation.AgentAttachment
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
+import com.aicode.feature.settings.data.repository.GeneralSettingsRepository
 import com.aicode.feature.settings.data.repository.ProviderKeyRotator
 import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
@@ -95,6 +96,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val titleModelSettingsRepository: TitleModelSettingsRepository,
     private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
+    private val generalSettingsRepository: GeneralSettingsRepository,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
     private val checkpointManager: CheckpointManager,
@@ -293,6 +295,8 @@ class StatefulAgentWorkflow @Inject constructor(
         provider.maxOutputTokens = metadata.outputTokens
         // 元数据说不接受自定义温度就不发该字段（kimi-k3、gpt-5 系带了直接 400）；允许的只发官方固定值。
         provider.temperature = if (metadata.supportsCustomTemperature) fixedTemperature(config.effectiveModel) else null
+        provider.firstByteTimeoutMs = generalSettingsRepository.firstByteTimeoutMs()
+        provider.streamIdleTimeoutMs = generalSettingsRepository.streamIdleTimeoutMs()
         return provider
     }
 

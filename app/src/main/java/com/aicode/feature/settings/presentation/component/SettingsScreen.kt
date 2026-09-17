@@ -205,6 +205,8 @@ fun SettingsScreen(
     val agentSoundEnabled by viewModel.agentSoundEnabled.collectAsStateWithLifecycle()
     val autoRemoveStaleModels by viewModel.autoRemoveStaleModels.collectAsStateWithLifecycle()
     val startupSessionMode by viewModel.startupSessionMode.collectAsStateWithLifecycle()
+    val firstByteTimeoutSec by viewModel.firstByteTimeoutSec.collectAsStateWithLifecycle()
+    val streamIdleTimeoutSec by viewModel.streamIdleTimeoutSec.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themePresetId by viewModel.themePresetId.collectAsStateWithLifecycle()
     val dynamicColorEnabled by viewModel.dynamicColorEnabled.collectAsStateWithLifecycle()
@@ -728,7 +730,11 @@ fun SettingsScreen(
                     autoRemoveStaleModels = autoRemoveStaleModels,
                     onToggleAutoRemoveStaleModels = { viewModel.setAutoRemoveStaleModels(it) },
                     startupSessionMode = startupSessionMode,
-                    onSelectStartupSessionMode = { viewModel.setStartupSessionMode(it) }
+                    onSelectStartupSessionMode = { viewModel.setStartupSessionMode(it) },
+                    firstByteTimeoutSec = firstByteTimeoutSec,
+                    onSetFirstByteTimeoutSec = { viewModel.setFirstByteTimeoutSec(it) },
+                    streamIdleTimeoutSec = streamIdleTimeoutSec,
+                    onSetStreamIdleTimeoutSec = { viewModel.setStreamIdleTimeoutSec(it) }
                 )
                 SettingsSection.Providers -> ProvidersSection(
                     providers = providers,

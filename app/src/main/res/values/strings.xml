@@ -18,6 +18,14 @@
     <string name="settings_startup_session_new_desc">复用还没发过消息的空会话，否则新建</string>
     <string name="settings_startup_session_recent">打开最近会话</string>
     <string name="settings_startup_session_recent_desc">直接进入最近更新的会话</string>
+    <string name="settings_general_network">网络</string>
+    <string name="settings_first_byte_timeout">首字超时</string>
+    <string name="settings_first_byte_timeout_desc">等待首个响应块的最长时间</string>
+    <string name="settings_stream_idle_timeout">数据块间隔超时</string>
+    <string name="settings_stream_idle_timeout_desc">两个响应块之间的最长等待</string>
+    <string name="settings_timeout_unlimited">不限制</string>
+    <string name="settings_timeout_seconds">%1$d 秒</string>
+    <string name="settings_timeout_input_hint">单位秒，填 0 表示不限制</string>
     <string name="settings_vision_model">识图模型</string>
     <string name="settings_compaction_model">压缩模型</string>
     <string name="settings_title_model">标题总结模型</string>

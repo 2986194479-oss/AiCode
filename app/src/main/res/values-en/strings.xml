@@ -18,6 +18,14 @@
     <string name="settings_startup_session_new_desc">Reuse an empty session, otherwise start a new one</string>
     <string name="settings_startup_session_recent">Recent session</string>
     <string name="settings_startup_session_recent_desc">Open the most recently updated session</string>
+    <string name="settings_general_network">Network</string>
+    <string name="settings_first_byte_timeout">First byte timeout</string>
+    <string name="settings_first_byte_timeout_desc">Max wait for the first response chunk</string>
+    <string name="settings_stream_idle_timeout">Chunk idle timeout</string>
+    <string name="settings_stream_idle_timeout_desc">Max wait between response chunks</string>
+    <string name="settings_timeout_unlimited">Unlimited</string>
+    <string name="settings_timeout_seconds">%1$d s</string>
+    <string name="settings_timeout_input_hint">Seconds; 0 means unlimited</string>
     <string name="settings_vision_model">Vision Model</string>
     <string name="settings_compaction_model">Compaction Model</string>
     <string name="settings_title_model">Title Model</string>
