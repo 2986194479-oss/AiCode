@@ -8,6 +8,16 @@
     <string name="settings_providers">AI Providers</string>
     <string name="settings_provider_editor">Provider</string>
     <string name="settings_default_models">Default Models</string>
+    <string name="settings_general">General</string>
+    <string name="settings_general_models">Models</string>
+    <string name="settings_auto_remove_stale_models">Remove stale models after fetching</string>
+    <string name="settings_auto_remove_stale_models_desc">On a successful fetch, drop local models the provider no longer offers</string>
+    <string name="settings_general_session">Session</string>
+    <string name="settings_startup_session">Session on launch</string>
+    <string name="settings_startup_session_new">New session</string>
+    <string name="settings_startup_session_new_desc">Reuse an empty session, otherwise start a new one</string>
+    <string name="settings_startup_session_recent">Recent session</string>
+    <string name="settings_startup_session_recent_desc">Open the most recently updated session</string>
     <string name="settings_vision_model">Vision Model</string>
     <string name="settings_compaction_model">Compaction Model</string>
     <string name="settings_title_model">Title Model</string>

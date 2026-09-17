@@ -104,6 +104,7 @@ import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Save
 import compose.icons.feathericons.Server
 import compose.icons.feathericons.Shield
+import compose.icons.feathericons.Sliders
 import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.Trash2
 import compose.icons.feathericons.Users
@@ -131,6 +132,7 @@ private val SettingsTwoPaneMinWidth = 840.dp
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
 internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Menu(R.string.settings_title),
+    General(R.string.settings_general),
     Providers(R.string.settings_providers),
     ProviderEditor(R.string.settings_provider_editor),
     DefaultModels(R.string.settings_default_models),
@@ -201,6 +203,8 @@ fun SettingsScreen(
     val keepaliveEnabled by viewModel.keepaliveEnabled.collectAsStateWithLifecycle()
     val screenOnEnabled by viewModel.screenOnEnabled.collectAsStateWithLifecycle()
     val agentSoundEnabled by viewModel.agentSoundEnabled.collectAsStateWithLifecycle()
+    val autoRemoveStaleModels by viewModel.autoRemoveStaleModels.collectAsStateWithLifecycle()
+    val startupSessionMode by viewModel.startupSessionMode.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themePresetId by viewModel.themePresetId.collectAsStateWithLifecycle()
     val dynamicColorEnabled by viewModel.dynamicColorEnabled.collectAsStateWithLifecycle()
@@ -720,6 +724,12 @@ fun SettingsScreen(
             when (current) {
                 // 大屏菜单已常驻左栏，右栏在没选中分区时给个占位提示
                 SettingsSection.Menu -> if (expanded) SettingsDetailPlaceholder() else menuBody()
+                SettingsSection.General -> GeneralSettingsSection(
+                    autoRemoveStaleModels = autoRemoveStaleModels,
+                    onToggleAutoRemoveStaleModels = { viewModel.setAutoRemoveStaleModels(it) },
+                    startupSessionMode = startupSessionMode,
+                    onSelectStartupSessionMode = { viewModel.setStartupSessionMode(it) }
+                )
                 SettingsSection.Providers -> ProvidersSection(
                     providers = providers,
                     onEdit = {
@@ -1302,6 +1312,12 @@ internal fun SettingsMenu(
         // ── 系统 ──
         SettingsGroupHeader(text = stringResource(R.string.settings_category_system))
         SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.Sliders,
+                title = stringResource(SettingsSection.General.titleRes),
+                onClick = { onOpen(SettingsSection.General) }
+            )
+            SettingsDivider()
             SettingsRow(
                 icon = FeatherIcons.BarChart2,
                 title = stringResource(SettingsSection.TokenStats.titleRes),

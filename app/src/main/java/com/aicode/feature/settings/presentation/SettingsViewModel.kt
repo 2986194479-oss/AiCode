@@ -57,6 +57,7 @@ import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepositor
 import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.settings.data.repository.ExecutionModeRepository
+import com.aicode.feature.settings.data.repository.GeneralSettingsRepository
 import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
@@ -64,6 +65,7 @@ import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.settings.data.repository.ProxyConfig
 import com.aicode.feature.settings.data.repository.ProxySettingsRepository
 import com.aicode.feature.settings.data.repository.ScreenOnSettingsRepository
+import com.aicode.feature.settings.data.repository.StartupSessionMode
 import com.aicode.feature.settings.data.repository.ThemeSettingsRepository
 import com.aicode.feature.settings.data.repository.BackgroundSettingsRepository
 import com.aicode.feature.settings.data.repository.ImageGenModelSettingsRepository
@@ -280,6 +282,7 @@ class SettingsViewModel @Inject constructor(
     private val keepaliveSettingsRepository: KeepaliveSettingsRepository,
     private val screenOnSettingsRepository: ScreenOnSettingsRepository,
     private val agentSoundSettingsRepository: AgentSoundSettingsRepository,
+    private val generalSettingsRepository: GeneralSettingsRepository,
     private val languageSettingsRepository: LanguageSettingsRepository,
     private val mcpConfigRepository: McpConfigRepository,
     private val mcpManager: McpManager,
@@ -441,6 +444,12 @@ class SettingsViewModel @Inject constructor(
 
     private val _agentSoundEnabled = MutableStateFlow(false)
     val agentSoundEnabled: StateFlow<Boolean> = _agentSoundEnabled.asStateFlow()
+
+    private val _autoRemoveStaleModels = MutableStateFlow(true)
+    val autoRemoveStaleModels: StateFlow<Boolean> = _autoRemoveStaleModels.asStateFlow()
+
+    private val _startupSessionMode = MutableStateFlow(StartupSessionMode.NEW_SESSION)
+    val startupSessionMode: StateFlow<StartupSessionMode> = _startupSessionMode.asStateFlow()
 
     private val _themeMode = MutableStateFlow(AppThemeMode.AUTO)
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
@@ -695,6 +704,18 @@ class SettingsViewModel @Inject constructor(
             launch {
                 agentSoundSettingsRepository.enabledFlow.collectLatest {
                     _agentSoundEnabled.value = it
+                }
+            }
+
+            launch {
+                generalSettingsRepository.autoRemoveStaleModelsFlow.collectLatest {
+                    _autoRemoveStaleModels.value = it
+                }
+            }
+
+            launch {
+                generalSettingsRepository.startupSessionModeFlow.collectLatest {
+                    _startupSessionMode.value = it
                 }
             }
 
@@ -1222,6 +1243,20 @@ class SettingsViewModel @Inject constructor(
     fun setAgentSoundEnabled(enabled: Boolean) {
         viewModelScope.launch {
             agentSoundSettingsRepository.setEnabled(enabled)
+        }
+    }
+
+    /** 拉取模型成功后是否自动移除远端已不存在的本地模型。 */
+    fun setAutoRemoveStaleModels(enabled: Boolean) {
+        viewModelScope.launch {
+            generalSettingsRepository.setAutoRemoveStaleModels(enabled)
+        }
+    }
+
+    /** 启动（含切换工作区）时进入新会话还是最近会话。 */
+    fun setStartupSessionMode(mode: StartupSessionMode) {
+        viewModelScope.launch {
+            generalSettingsRepository.setStartupSessionMode(mode)
         }
     }
 

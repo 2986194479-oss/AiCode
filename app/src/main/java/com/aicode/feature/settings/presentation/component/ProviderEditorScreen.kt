@@ -257,6 +257,7 @@ fun ProviderEditorScreen(
     }
 
     val fetchState by viewModel.fetchState.collectAsStateWithLifecycle()
+    val autoRemoveStaleModels by viewModel.autoRemoveStaleModels.collectAsStateWithLifecycle()
     val testResults by viewModel.testResults.collectAsStateWithLifecycle()
     val testing by viewModel.testing.collectAsStateWithLifecycle()
     val proxyTestState by viewModel.proxyTestState.collectAsStateWithLifecycle()
@@ -342,8 +343,9 @@ fun ProviderEditorScreen(
         onSave(currentConfig())
     }
 
-    // 拉取成功后自动对齐：远端已不存在的本地模型直接移除。拉取失败或返回空列表时不动列表。
-    LaunchedEffect(fetchState, showFetchDialog) {
+    // 拉取成功后自动对齐：远端已不存在的本地模型直接移除（可在「通用设置」关掉）。拉取失败或返回空列表时不动列表。
+    LaunchedEffect(fetchState, showFetchDialog, autoRemoveStaleModels) {
+        if (!autoRemoveStaleModels) return@LaunchedEffect
         val state = fetchState
         if (!showFetchDialog || state !is FetchState.Success) return@LaunchedEffect
         val remote = state.models.map { it.trim() }.filter { it.isNotEmpty() }.toSet()

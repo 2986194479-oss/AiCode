@@ -8,6 +8,16 @@
     <string name="settings_providers">AI 提供商</string>
     <string name="settings_provider_editor">提供商</string>
     <string name="settings_default_models">默认模型</string>
+    <string name="settings_general">通用设置</string>
+    <string name="settings_general_models">模型</string>
+    <string name="settings_auto_remove_stale_models">拉取模型后自动移除无效模型</string>
+    <string name="settings_auto_remove_stale_models_desc">拉取成功后，移除远端已不存在的本地模型</string>
+    <string name="settings_general_session">会话</string>
+    <string name="settings_startup_session">启动时会话</string>
+    <string name="settings_startup_session_new">新开会话</string>
+    <string name="settings_startup_session_new_desc">复用还没发过消息的空会话，否则新建</string>
+    <string name="settings_startup_session_recent">打开最近会话</string>
+    <string name="settings_startup_session_recent_desc">直接进入最近更新的会话</string>
     <string name="settings_vision_model">识图模型</string>
     <string name="settings_compaction_model">压缩模型</string>
     <string name="settings_title_model">标题总结模型</string>

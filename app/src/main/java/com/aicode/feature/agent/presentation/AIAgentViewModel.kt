@@ -25,8 +25,10 @@ import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
+import com.aicode.feature.settings.data.repository.GeneralSettingsRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.ModelReasoningEffortRepository
+import com.aicode.feature.settings.data.repository.StartupSessionMode
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
@@ -127,6 +129,7 @@ class AIAgentViewModel @Inject constructor(
     private val backupManager: BackupManager,
     private val mcpManager: McpManager,
     private val agentSoundSettings: AgentSoundSettingsRepository,
+    private val generalSettingsRepository: GeneralSettingsRepository,
     private val keepaliveSettings: KeepaliveSettingsRepository,
     private val subAgentEventBus: SubAgentEventBus,
     private val agentNotificationCenter: AgentNotificationCenter,
@@ -801,12 +804,14 @@ class AIAgentViewModel @Inject constructor(
             _currentWorkspace.collectLatest { path ->
                 if (path.isBlank()) return@collectLatest
                 val recent = sessionUseCase.getFirstSessionOfWorkspace(path)
-                // 立即确定并设置当前会话：若最近会话未发过消息则直接复用，否则立即创建新会话。
-                // 确保首帧 UI 秒开、侧边栏立即出现新会话，彻底消除转圈卡顿。
-                val targetId = if (recent != null && sessionUseCase.isSessionEmpty(recent.id)) {
-                    recent.id
-                } else {
-                    createAndUpsertSession(path)
+                // 立即确定并设置当前会话，确保首帧 UI 秒开、侧边栏立即出现新会话，彻底消除转圈卡顿。
+                // 「打开最近会话」有历史就直接进最近那个；「新开会话」复用还没发过消息的空会话
+                //（避免每次启动都堆一个空会话），其余情况新建。
+                val targetId = when {
+                    recent == null -> createAndUpsertSession(path)
+                    generalSettingsRepository.startupSessionMode() == StartupSessionMode.RECENT_SESSION -> recent.id
+                    sessionUseCase.isSessionEmpty(recent.id) -> recent.id
+                    else -> createAndUpsertSession(path)
                 }
                 _currentSessionId.value = targetId
 
