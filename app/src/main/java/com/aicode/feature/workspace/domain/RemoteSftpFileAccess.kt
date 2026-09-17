@@ -368,12 +368,11 @@ class RemoteSftpFileAccess @Inject constructor(
                     }
                 }
             }
-
             tempFile
-        } catch (e: Exception) {
+        }.getOrElse {
             // 用完即删：临时文件不依赖 deleteOnExit（只在进程退出清），失败路径也回收，避免长会话累积。
             runCatching { tempFile.delete() }
-            FileLogger.e(TAG, "copyToLocal 失败: $remote", e)
+            FileLogger.e(TAG, "copyToLocal 失败: $remote", it)
             throw NoSuchFileException(File(remote))
         }
     }
