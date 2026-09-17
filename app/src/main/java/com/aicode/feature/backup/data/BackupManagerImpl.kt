@@ -33,6 +33,7 @@ import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.data.local.entity.AIProviderEntity
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
+import com.aicode.feature.settings.data.repository.GeneralSettingsRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.ScreenOnSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
@@ -82,6 +83,7 @@ class BackupManagerImpl @Inject constructor(
     private val keepaliveSettingsRepository: KeepaliveSettingsRepository,
     private val screenOnSettingsRepository: ScreenOnSettingsRepository,
     private val agentSoundSettingsRepository: AgentSoundSettingsRepository,
+    private val generalSettingsRepository: GeneralSettingsRepository,
     private val logSettingsRepository: LogSettingsRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
@@ -332,6 +334,8 @@ class BackupManagerImpl @Inject constructor(
         keepaliveEnabled = if (options.appSettings) keepaliveSettingsRepository.snapshot() else false,
         screenOnEnabled = if (options.appSettings) screenOnSettingsRepository.snapshot() else false,
         agentSoundEnabled = if (options.appSettings) agentSoundSettingsRepository.snapshot() else false,
+        autoRemoveStaleModels = if (options.appSettings) generalSettingsRepository.autoRemoveStaleModelsSnapshot() else true,
+        startupSessionMode = if (options.appSettings) generalSettingsRepository.startupSessionModeSnapshot() else null,
         logLevel = if (options.appSettings) logSettingsRepository.snapshot() else null,
         visionProviderId = if (options.appSettings) visionModelSettingsRepository.getVisionProviderId() else "",
         visionModel = if (options.appSettings) visionModelSettingsRepository.getVisionModel() else "",
@@ -606,6 +610,8 @@ class BackupManagerImpl @Inject constructor(
         keepaliveSettingsRepository.restore(meta.keepaliveEnabled)
         screenOnSettingsRepository.restore(meta.screenOnEnabled)
         agentSoundSettingsRepository.restore(meta.agentSoundEnabled)
+        generalSettingsRepository.restoreAutoRemoveStaleModels(meta.autoRemoveStaleModels)
+        generalSettingsRepository.restoreStartupSessionMode(meta.startupSessionMode)
         logSettingsRepository.restore(meta.logLevel)
         if (meta.visionProviderId.isNotBlank() || meta.visionModel.isNotBlank()) {
             visionModelSettingsRepository.setVisionModel(meta.visionProviderId, meta.visionModel)
