@@ -336,6 +336,8 @@ class BackupManagerImpl @Inject constructor(
         agentSoundEnabled = if (options.appSettings) agentSoundSettingsRepository.snapshot() else false,
         autoRemoveStaleModels = if (options.appSettings) generalSettingsRepository.autoRemoveStaleModelsSnapshot() else true,
         startupSessionMode = if (options.appSettings) generalSettingsRepository.startupSessionModeSnapshot() else null,
+        firstByteTimeoutSec = if (options.appSettings) generalSettingsRepository.firstByteTimeoutSecSnapshot() else 300,
+        streamIdleTimeoutSec = if (options.appSettings) generalSettingsRepository.streamIdleTimeoutSecSnapshot() else 0,
         logLevel = if (options.appSettings) logSettingsRepository.snapshot() else null,
         visionProviderId = if (options.appSettings) visionModelSettingsRepository.getVisionProviderId() else "",
         visionModel = if (options.appSettings) visionModelSettingsRepository.getVisionModel() else "",
@@ -612,6 +614,8 @@ class BackupManagerImpl @Inject constructor(
         agentSoundSettingsRepository.restore(meta.agentSoundEnabled)
         generalSettingsRepository.restoreAutoRemoveStaleModels(meta.autoRemoveStaleModels)
         generalSettingsRepository.restoreStartupSessionMode(meta.startupSessionMode)
+        generalSettingsRepository.restoreFirstByteTimeoutSec(meta.firstByteTimeoutSec)
+        generalSettingsRepository.restoreStreamIdleTimeoutSec(meta.streamIdleTimeoutSec)
         logSettingsRepository.restore(meta.logLevel)
         if (meta.visionProviderId.isNotBlank() || meta.visionModel.isNotBlank()) {
             visionModelSettingsRepository.setVisionModel(meta.visionProviderId, meta.visionModel)
