@@ -989,6 +989,7 @@
     <string name="provider_filter_models_hint">输入模型名称筛选</string>
     <string name="provider_fetch_failed">拉取失败：%1$s</string>
     <string name="provider_no_matching_models">没有匹配的模型</string>
+    <string name="provider_models_aligned_removed">已移除 %1$d 个远端已不存在的模型</string>
     <string name="provider_please_wait">请稍候…</string>
     <string name="provider_test">测试</string>
 

@@ -989,6 +989,7 @@
     <string name="provider_filter_models_hint">Filter models by name</string>
     <string name="provider_fetch_failed">Fetch failed: %1$s</string>
     <string name="provider_no_matching_models">No matching models</string>
+    <string name="provider_models_aligned_removed">Removed %1$d model(s) no longer offered by the provider</string>
     <string name="provider_please_wait">Please wait…</string>
     <string name="provider_test">Test</string>
 

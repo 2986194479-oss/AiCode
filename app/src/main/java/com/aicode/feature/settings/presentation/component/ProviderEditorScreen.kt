@@ -342,6 +342,24 @@ fun ProviderEditorScreen(
         onSave(currentConfig())
     }
 
+    // 拉取成功后自动对齐：远端已不存在的本地模型直接移除。拉取失败或返回空列表时不动列表。
+    LaunchedEffect(fetchState, showFetchDialog) {
+        val state = fetchState
+        if (!showFetchDialog || state !is FetchState.Success) return@LaunchedEffect
+        val remote = state.models.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        if (remote.isEmpty()) return@LaunchedEffect
+        val stale = models.filterNot { it in remote }
+        if (stale.isNotEmpty()) {
+            models.removeAll(stale)
+            saveCurrent()
+            Toast.makeText(
+                context,
+                context.getString(R.string.provider_models_aligned_removed, stale.size),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     val modelsReorderableState = rememberReorderableLazyListState(modelsListState) { from, to ->
         if (from.index !in models.indices || to.index !in models.indices || from.index == to.index) return@rememberReorderableLazyListState
         models.add(to.index, models.removeAt(from.index))
