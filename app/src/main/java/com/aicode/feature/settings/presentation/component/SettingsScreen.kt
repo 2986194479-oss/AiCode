@@ -71,6 +71,8 @@ import com.aicode.R
 import com.aicode.feature.agent.domain.mcp.McpServerEntry
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpServerStatus
+import com.aicode.feature.agent.domain.mcp.server.McpServerManager
+import com.aicode.feature.agent.domain.mcp.server.McpServerPanel
 import com.aicode.feature.agent.presentation.component.MarkdownContent
 import com.aicode.feature.agent.presentation.component.MarkdownRenderCache
 import com.aicode.feature.backup.presentation.BackupSection
