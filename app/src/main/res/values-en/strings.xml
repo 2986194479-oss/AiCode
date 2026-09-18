@@ -31,6 +31,7 @@
     <string name="settings_title_model">Title Model</string>
     <string name="settings_image_gen_model">Image Generation Model</string>
     <string name="settings_mcp">MCP Servers</string>
+    <string name="settings_mcp_server">MCP Server</string>
     <string name="settings_skills">Skills</string>
     <string name="settings_container">Container &amp; Images</string>
     <string name="settings_log_no_files">No log files yet</string>

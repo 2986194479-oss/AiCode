@@ -310,7 +310,8 @@ class SettingsViewModel @Inject constructor(
     private val updateCheckService: UpdateCheckService,
     private val providerBalanceRunner: ProviderBalanceRunner,
     private val terminalSettingsRepository: TerminalSettingsRepository,
-    private val proxySettingsRepository: ProxySettingsRepository
+    private val proxySettingsRepository: ProxySettingsRepository,
+    private val mcpServerManager: com.aicode.feature.agent.domain.mcp.server.McpServerManager
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -945,6 +946,24 @@ class SettingsViewModel @Inject constructor(
             } finally {
                 _mcpReloading.value = false
             }
+        }
+    }
+
+    /** MCP 服务端管理器（暴露给设置页服务端面板用）。 */
+    val mcpServerManagerRef: com.aicode.feature.agent.domain.mcp.server.McpServerManager
+        get() = this.mcpServerManager
+
+    /** 切换 MCP 服务端启停：更新配置并持久化，再应用。 */
+    fun toggleMcpServer(enabled: Boolean) {
+        viewModelScope.launch {
+            val repo = mcpServerManagerRef.let { it }
+            val cfg = com.aicode.feature.agent.domain.mcp.server.McpServerConfig(
+                enabled = enabled,
+                port = 0,
+                bindAllInterfaces = false,
+                authToken = ""
+            )
+            mcpServerManagerRef.applyConfig(cfg.copy(port = com.aicode.feature.agent.domain.mcp.server.McpServerConfig.DEFAULT_PORT))
         }
     }
 

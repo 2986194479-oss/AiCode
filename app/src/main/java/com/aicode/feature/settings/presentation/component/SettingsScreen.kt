@@ -137,6 +137,7 @@ internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     ProviderEditor(R.string.settings_provider_editor),
     DefaultModels(R.string.settings_default_models),
     Mcp(R.string.settings_mcp),
+    McpServer(R.string.settings_mcp_server),
     Skills(R.string.settings_skills),
     SkillDetail(R.string.settings_skills),
     SkillEditor(R.string.settings_skills),
@@ -780,6 +781,10 @@ fun SettingsScreen(
                     },
                     onDelete = { name, scope -> viewModel.deleteMcpServer(name, scope) }
                 )
+                SettingsSection.McpServer -> McpServerPanel(
+                    manager = viewModel.mcpServerManagerRef,
+                    onToggle = { viewModel.toggleMcpServer(it) }
+                )
                 SettingsSection.Skills -> SkillsSection(
                     projectName = currentProjectName,
                     entries = skills,
@@ -1194,6 +1199,12 @@ internal fun SettingsMenu(
                 icon = FeatherIcons.Box,
                 title = stringResource(SettingsSection.Mcp.titleRes),
                 onClick = { onOpen(SettingsSection.Mcp) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Server,
+                title = stringResource(SettingsSection.McpServer.titleRes),
+                onClick = { onOpen(SettingsSection.McpServer) }
             )
             SettingsDivider()
             SettingsRow(
