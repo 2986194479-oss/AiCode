@@ -28,8 +28,7 @@ import javax.inject.Singleton
 @Singleton
 class McpHttpServer @Inject constructor(
     private val protocol: McpServerProtocol,
-    private val configRepository: McpServerConfigRepository,
-    private val json: Json = DEFAULT_JSON
+    private val configRepository: McpServerConfigRepository
 ) {
     private companion object {
         const val TAG = "McpHttpServer"
@@ -46,7 +45,7 @@ class McpHttpServer @Inject constructor(
         stop()
         FileLogger.i(TAG, "启动 MCP HTTP 服务，端口 $port")
         val s = embeddedServer(CIO, port = port) {
-            install(ContentNegotiation) { json(json) }
+            install(ContentNegotiation) { json(DEFAULT_JSON) }
             routing {
                 post(McpServerConfig.DEFAULT_PATH) {
                     // 访问保护：token 非空时校验 Bearer
@@ -61,7 +60,7 @@ class McpHttpServer @Inject constructor(
                         }
                     }
                     val body = call.receiveText()
-                    val req = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+                    val req = runCatching { DEFAULT_JSON.parseToJsonElement(body).jsonObject }.getOrNull()
                     if (req == null) {
                         call.respondText("invalid json", ContentType.Text.Plain, HttpStatusCode.BadRequest)
                         return@post
