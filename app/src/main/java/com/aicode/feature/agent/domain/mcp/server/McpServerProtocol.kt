@@ -1,11 +1,11 @@
 package com.aicode.feature.agent.domain.mcp.server
 
 import com.aicode.core.util.FileLogger
+import kotlinx.serialization.json.Json
 import com.aicode.feature.agent.domain.mcp.McpToolDescriptor
 import com.aicode.feature.agent.domain.tool.AgentTool
 import com.aicode.feature.agent.domain.tool.ToolRegistry
 import com.aicode.feature.agent.domain.tool.ToolResult
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -31,7 +31,6 @@ import javax.inject.Singleton
 @Singleton
 class McpServerProtocol @Inject constructor(
     private val toolRegistry: ToolRegistry,
-    private val json: Json = DEFAULT_JSON
 ) {
     private companion object {
         const val TAG = "McpServerProtocol"
